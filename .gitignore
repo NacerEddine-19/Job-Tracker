@@ -1,0 +1,21 @@
+# Personal job-application data (do not commit)
+applications.csv
+applications.csv.tmp
+
+# Runtime / editor artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.tmp
+.env
+.venv/
+venv/
+.claude
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+# .idea/

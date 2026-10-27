@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · Job Application Tracker</title>
+<style>
+:root{
+  --bg:#f6f7fb;--card:#fff;--text:#1b2033;--muted:#6b7390;--line:#e4e7f0;
+  --surface:#fcfcfb;--grid:#e1e0d9;--axis:#c3c2b7;--ink:#0b0b0b;--text-sec:#52514e;--muted-ink:#898781;
+  --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0f1220;--card:#181c30;--text:#e8eaf5;--muted:#9097b5;--line:#2a2f4a;
+  --surface:#1a1a19;--grid:#2c2c2a;--axis:#383835;--ink:#ffffff;--text-sec:#c3c2b7;--muted-ink:#898781;
+  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:24px 16px 48px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:20px}
+h1{margin:0;font-size:20px}header p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--text);padding:8px 13px;border-radius:10px;font:inherit;cursor:pointer;text-decoration:none}
+.btn.primary{background:var(--s1);color:#fff;border-color:var(--s1);font-weight:600}
+.btn:hover{filter:brightness(.95)}
+.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:12px}
+.filters label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-right:6px}
+.filters select,.filters input{font:inherit;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 10px;color:var(--text)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+.tile .t{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.tile .v{font-size:28px;font-weight:600;letter-spacing:-0.5px}
+.tile .d{font-size:12.5px;margin-top:4px}
+.tile .d.up{color:#199e70}.tile .d.down{color:#eb6834}.tile .d.neutral{color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:0;margin-bottom:20px;overflow:hidden}
+.card .head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);background:var(--bg)}
+.card h2{margin:0;font-size:16px;color:var(--text)}
+.plot{padding:14px 16px;min-height:260px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+tr:hover{background:rgba(0,0,0,0.02)}
+.empty{text-align:center;color:var(--muted);padding:24px 0}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;font-size:12px}
+.legend li{display:flex;align-items:center;gap:6px;list-style:none;white-space:nowrap}
+.swatch{width:10px;height:10px;border-radius:2px;border:1px solid rgba(0,0,0,0.15)}
+.tooltip{position:absolute;pointer-events:none;padding:6px 9px;border-radius:8px;background:rgba(11,11,11,0.85);color:#fff;font-size:12px;line-height:1.3;border:1px solid rgba(255,255,255,0.1);box-shadow:0 4px 12px rgba(0,0,0,0.25);white-space:nowrap;opacity:0;transition:opacity .15s;z-index:10}
+.tooltip.show{opacity:1}
+.small{color:var(--muted);font-size:12.5px}
+
+/* status pill colors preserved from index.html for reference only -- NOT used in charts (fail CVD: blue↔purple ΔE 0.4 deutan) */
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Job Search Dashboard</h1>
+    <p>Stats from <code>applications.csv</code>. Use the filters below — every chart re-renders against the same slice.</p>
+  </div>
+  <a class="btn primary" href="/">← Back to tracker</a>
+</header>
+
+<div class="filters">
+  <label>Status</label>
+  <select id="fStatus"><option value="">All statuses</option></select>
+  <label>Period</label>
+  <select id="fPeriod"><option value="">All time</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="custom">Custom range</option></select>
+  <input id="fFrom" type="date"><input id="fTo" type="date">
+  <button class="btn" id="fReset">Reset</button>
+</div>
+
+<div class="kpis">
+  <div class="tile"><div class="t">Total applications</div><div class="v" id="kpiTotal">—</div><div class="d neutral" id="kpiTotalDelta"></div></div>
+  <div class="tile"><div class="t">Applied</div><div class="v" id="kpiApplied">—</div><div class="d neutral" id="kpiAppliedDelta"></div></div>
+  <div class="tile"><div class="t">Interview</div><div class="v" id="kpiInterview">—</div><div class="d neutral" id="kpiInterviewDelta"></div></div>
+  <div class="tile"><div class="t">Offer</div><div class="v" id="kpiOffer">—</div><div class="d neutral" id="kpiOfferDelta"></div></div>
+  <div class="tile"><div class="t">Rejected</div><div class="v" id="kpiRejected">—</div><div class="d neutral" id="kpiRejectedDelta"></div></div>
+</div>
+
+<section class="card">
+  <div class="head"><h2>Applications by status</h2><div class="small" id="subStatus">vs all time</div></div>
+  <div class="plot"><svg id="svgStatus" width="100%" height="260" role="img" aria-label="Applications by status"></svg></div>
+  <ul class="legend" id="legendStatus"></ul>
+  <table><thead><tr><th>Status</th><th>Count</th><th>Share</th></tr></thead><tbody id="tblStatus"></tbody></table>
+</section>
+
+<section class="card">
+  <div class="head"><h2>Applications over time</h2><div class="small" id="subTime">new applications per day</div></div>
+  <div class="plot" style="position:relative"><svg id="svgTime" width="100%" height="230" role="img" aria-label="Applications over time"></svg><div id="tipTime" class="tooltip"></div></div>
+  <table><thead><tr><th>Date</th><th>New applications</th></tr></thead><tbody id="tblTime"></tbody></table>
+</section>
+
+<section class="card">
+  <div class="head"><h2>Top companies</h2><div class="small" id="subCompanies">applications per company</div></div>
+  <div class="plot"><svg id="svgCompanies" width="100%" height="240" role="img" aria-label="Top companies by applications"></svg></div>
+  <table><thead><tr><th>Company</th><th>Applications</th><th>Latest status</th></tr></thead><tbody id="tblCompanies"></tbody></table>
+</section>
+
+<p class="small" style="margin-top:8px">Colors follow the validated categorical palette (slots 1–5); a table view sits under every chart so no value is color-only.</p>
+</div>
+
+<script>
+var $=function(id){return document.getElementById(id)};
+var STATUS=["Wishlist","Applied","Interview","Offer","Rejected"];
+var SLOTS=["--s1","--s2","--s3","--s4","--s5"];
+var apps=[],filtered=[];
+
+async function load(){
+  try{
+    var r=await fetch("/api/applications");apps=await r.json();
+  }catch(e){return}
+  bindFilters();
+  render();
+}
+function bindFilters(){
+  var sel=$("fStatus");sel.innerHTML='<option value="">All statuses</option>'+STATUS.map(function(s){return'<option value="'+s+'">'+s+'</option>'}).join("");
+  $("fStatus").onchange=render;
+  $("fPeriod").onchange=function(){
+    $("fFrom").disabled=$("fTo").disabled=this.value!=="custom";
+    render();
+  };
+  $("fFrom").onchange=render;$("fTo").onchange=render;
+  $("fReset").onclick=function(){
+    $("fStatus").value="";$("fPeriod").value="";$("fFrom").value="";$("fTo").value="";
+    $("fFrom").disabled=true;$("fTo").disabled=true;render();
+  };
+  $("fFrom").disabled=true;$("fTo").disabled=true;
+}
+function parseDate(s){if(!s)return null;var p=s.split("-");return new Date(p[0],p[1]-1,p[2]);}
+function inRange(a){
+  var p=$("fPeriod").value,from=$("fFrom").value,to=$("fTo").value,d=parseDate(a.date);
+  if(!d)return false;
+  if(p==="30"){var cut=new Date();cut.setDate(cut.getDate()-30);return d>=cut;}
+  if(p==="90"){var cut=new Date();cut.setDate(cut.getDate()-90);return d>=cut;}
+  if(p==="custom"&&from&&to){var f=parseDate(from),t=parseDate(to);t.setHours(23,59,59,999);return d>=f&&d<=t;}
+  return true;
+}
+function statusColor(s){var i=STATUS.indexOf(s);return i<0?"--muted":"var("+SLOTS[i%SLOTS.length]+")";}
+function render(){
+  filtered=apps.filter(inRange);
+  var counts={};STATUS.forEach(function(s){counts[s]=0;});filtered.forEach(function(a){if(counts[a.status]!==undefined)counts[a.status]++;});
+  renderKPIs(counts);
+  renderStatus(counts);
+  renderTime();
+  renderCompanies();
+}
+function renderKPIs(c){
+  $("kpiTotal").textContent=filtered.length;
+  STATUS.forEach(function(s){
+    $("kpi"+s).textContent=c[s]||0;
+  });
+}
+function fmtPct(n,d){return d?Math.round(100*n/d)+"%":"—%";}
+function renderStatus(c){
+  var max=Math.max.apply(null,STATUS.map(function(s){return c[s]||0;}));
+  var svg=$("svgStatus");var w=svg.clientWidth||700,h=svg.clientHeight||250;
+  var pad={l:60,r:20,t:10,b:30};var x0=pad.l,x1=w-pad.r,y0=h-pad.b,y1=pad.t;
+  var bw=(x1-x0)/STATUS.length*0.6,gap=2;
+  svg.innerHTML="";
+  // gridlines
+  var ticks=[0,1,2,3,4,5].filter(function(v){return v<=max||v===0;});
+  var grid=document.createElementNS("http://www.w3.org/2000/svg","g");
+  ticks.forEach(function(v){
+    var yy=y0-(y0-y1)*(v/max|| (max?0:1));
+    if(max===0)yy=y0;
+    var line=document.createElementNS("http://www.w3.org/2000/svg","line");
+    line.setAttribute("x1",x0);line.setAttribute("x2",x1);line.setAttribute("y1",yy);line.setAttribute("y2",yy);
+    line.setAttribute("stroke",varGrid());line.setAttribute("stroke-width","1");grid.appendChild(line);
+    var txt=document.createElementNS("http://www.w3.org/2000/svg","text");
+    txt.setAttribute("x",x0-8);txt.setAttribute("y",yy+3);txt.setAttribute("fill",varInkMuted());txt.setAttribute("font-size","11");txt.setAttribute("text-anchor","end");txt.textContent=v;grid.appendChild(txt);
+  });
+  svg.appendChild(grid);
+  STATUS.forEach(function(s,i){
+    var v=c[s]||0;var xx=x0+(i+0.5)*(x1-x0)/STATUS.length-bw/2;var yy=y0-(y0-y1)*(max?v/max:0);
+    var rect=document.createElementNS("http://www.w3.org/2000/svg","rect");
+    rect.setAttribute("x",xx);rect.setAttribute("y",yy);rect.setAttribute("width",bw);rect.setAttribute("height",y0-yy);
+    rect.setAttribute("fill","var("+SLOTS[i%SLOTS.length]+")");rect.setAttribute("rx",4);svg.appendChild(rect);
+    if(v>0){var lab=document.createElementNS("http://www.w3.org/2000/svg","text");
+      lab.setAttribute("x",xx+bw/2);lab.setAttribute("y",yy-6);lab.setAttribute("fill","#0b0b0b");lab.setAttribute("font-size","12");lab.setAttribute("font-weight","600");lab.setAttribute("text-anchor","middle");lab.textContent=v;svg.appendChild(lab);}
+    var ax=document.createElementNS("http://www.w3.org/2000/svg","text");
+    ax.setAttribute("x",xx+bw/2);ax.setAttribute("y",y0+18);ax.setAttribute("fill",varInkMuted());ax.setAttribute("font-size","11");ax.setAttribute("text-anchor","middle");ax.textContent=s;svg.appendChild(ax);
+  });
+  svg.setAttribute("width",w);svg.setAttribute("height",h);
+  $("subStatus").textContent=filtered.length+" of "+apps.length+" applications";
+  var tb=$("tblStatus");tb.innerHTML="";
+  STATUS.forEach(function(s){var v=c[s]||0;var tr=document.createElement("tr");
+    var tdS=document.createElement("td");tdS.textContent=s;var tdC=document.createElement("td");tdC.textContent=v;tdC.style.fontVariantNumeric="tabular-nums";var tdP=document.createElement("td");tdP.textContent=filtered.length?fmtPct(v,filtered.length):"—";
+    tr.appendChild(tdS);tr.appendChild(tdC);tr.appendChild(tdP);tb.appendChild(tr);
+  });
+}
+function renderTime(){
+  // daily counts over window
+  var byDay={};filtered.forEach(function(a){byDay[a.date]=(byDay[a.date]||0)+1;});
+  var days=Object.keys(byDay).sort();
+  var svg=$("svgTime");var w=svg.clientWidth||700,h=svg.clientHeight||230;
+  var pad={l:50,r:20,t:10,b:34};var x0=pad.l,x1=w-pad.r,y0=h-pad.b,y1=pad.t;
+  svg.innerHTML="";svg.setAttribute("width",w);svg.setAttribute("height",h);
+  var max=Math.max.apply(null,days.map(function(d){return byDay[d];}))||1;
+  // area + line
+  var path="",area="";
+  days.forEach(function(d,i){
+    var xx=x0+(i/(days.length-1||1))*(x1-x0);var yy=y0-(y0-y1)*(byDay[d]/max);
+    if(i===0){path+="M "+xx+" "+yy;area+="M "+xx+" "+y0+" L "+xx+" "+yy+" ";}
+    else{path+="L "+xx+" "+yy;area+="L "+xx+" "+yy+" ";}
+  });
+  area+="L "+(x0+(days.length-1)*(x1-x0)/(days.length-1||1))+" "+y0+" Z";
+  if(area.indexOf("L")>0){
+    var ar=document.createElementNS("http://www.w3.org/2000/svg","path");ar.setAttribute("d",area);ar.setAttribute("fill","var(--s1)");ar.setAttribute("fill-opacity",0.12);svg.appendChild(ar);
+  }
+  var ln=document.createElementNS("http://www.w3.org/2000/svg","path");ln.setAttribute("d",path);ln.setAttribute("fill","none");ln.setAttribute("stroke","var(--s1)");ln.setAttribute("stroke-width","2");ln.setAttribute("stroke-linejoin","round");ln.setAttribute("stroke-linecap","round");svg.appendChild(ln);
+  // axis
+  var yAxis=document.createElementNS("http://www.w3.org/2000/svg","g");
+  [0,Math.round(max/2),max].forEach(function(v){
+    var yy=y0-(y0-y1)*(v/max);var line=document.createElementNS("http://www.w3.org/2000/svg","line");
+    line.setAttribute("x1",x0);line.setAttribute("x2",x1);line.setAttribute("y1",yy);line.setAttribute("y2",yy);line.setAttribute("stroke",varGrid());line.setAttribute("stroke-width","1");yAxis.appendChild(line);
+    var txt=document.createElementNS("http://www.w3.org/2000/svg","text");txt.setAttribute("x",x0-8);txt.setAttribute("y",yy+3);txt.setAttribute("fill",varInkMuted());txt.setAttribute("font-size","11");txt.setAttribute("text-anchor","end");txt.textContent=v;yAxis.appendChild(txt);
+  });svg.appendChild(yAxis);
+  days.forEach(function(d,i){var xx=x0+(i/(days.length-1||1))*(x1-x0);
+    var txt=document.createElementNS("http://www.w3.org/2000/svg","text");txt.setAttribute("x",xx);txt.setAttribute("y",y0+20);txt.setAttribute("fill",varInkMuted());txt.setAttribute("font-size","10");txt.setAttribute("text-anchor","middle");txt.textContent=d.slice(5);svg.appendChild(txt);
+  });
+  // hover crosshair + tooltip
+  var tip=$("tipTime"),cross=document.createElementNS("http://www.w3.org/2000/svg","line");
+  cross.setAttribute("stroke",varInkMuted());cross.setAttribute("stroke-width","1");cross.setAttribute("stroke-dasharray","4");cross.setAttribute("opacity","0");svg.appendChild(cross);
+  var overlay=document.createElementNS("http://www.w3.org/2000/svg","rect");
+  overlay.setAttribute("x",x0);overlay.setAttribute("y",y1);overlay.setAttribute("width",x1-x0);overlay.setAttribute("height",y0-y1);overlay.setAttribute("fill","transparent");overlay.setAttribute("pointer-events","all");svg.appendChild(overlay);
+  overlay.addEventListener("pointermove",function(ev){
+    var rect=svg.getBoundingClientRect();var sx=ev.clientX-rect.left;var i=Math.round((sx-x0)/(x1-x0)*(days.length-1||0));i=Math.max(0,Math.min(days.length-1,i));
+    var d=days[i],v=byDay[d]||0;var xx=x0+(i/(days.length-1||1))*(x1-x0);var yy=y0-(y0-y1)*(v/max);
+    cross.setAttribute("x1",xx);cross.setAttribute("y1",y1);cross.setAttribute("x2",xx);cross.setAttribute("y2",y0);cross.setAttribute("opacity","1");
+    tip.textContent=d+": "+v+" application"+(v!==1?"s":"");tip.classList.add("show");
+    var r=tip.getBoundingClientRect();var tx=Math.min(Math.max(ev.clientX+12,10),window.innerWidth-r.width-10);var ty=ev.clientY-r.height-10;
+    tip.style.left=tx+"px";tip.style.top=ty+"px";
+  });
+  overlay.addEventListener("pointerleave",function(){cross.setAttribute("opacity","0");tip.classList.remove("show");});
+  $("subTime").textContent=days.length+" days · "+filtered.length+" applications";
+  var tb=$("tblTime");tb.innerHTML="";
+  days.slice().reverse().forEach(function(d){
+    var v=byDay[d];var tr=document.createElement("tr");
+    var tdD=document.createElement("td");tdD.textContent=d;var tdC=document.createElement("td");tdC.textContent=v;tdC.style.fontVariantNumeric="tabular-nums";
+    tr.appendChild(tdD);tr.appendChild(tdC);tb.appendChild(tr);
+  });
+}
+function renderCompanies(){
+  var byCo={};filtered.forEach(function(a){if(!byCo[a.company])byCo[a.company]={n:0,status:{},latest:a.date,id:a.id??""};
+    byCo[a.company].n++;byCo[a.company].status[a.status]=(byCo[a.company].status[a.status]||0)+1;
+    if(a.date>byCo[a.company].latest){byCo[a.company].latest=a.date;byCo[a.company].id=a.id;}
+  });
+  var arr=Object.entries(byCo).map(function(e){return{company:e[0],n:e[1].n,status:e[1].status,date:e[1].latest};}).sort(function(a,b){return b.n-a.n;}).slice(0,8);
+  var svg=$("svgCompanies");var w=svg.clientWidth||700,h=svg.clientHeight||240;
+  var pad={l:160,r:10,t:10,b:30};var x0=pad.l,x1=w-pad.r,y0=h-pad.b,y1=pad.t;
+  svg.innerHTML="";svg.setAttribute("width",w);svg.setAttribute("height",h);
+  var max=Math.max.apply(null,arr.map(function(c){return c.n;}))||1;
+  arr.forEach(function(c,i){
+    var xx=x0+(i/(arr.length-1||1))*(x1-x0);var bw=(x1-x0)/arr.length*0.55;var yy=y0-(y0-y1)*(c.n/max);
+    var rect=document.createElementNS("http://www.w3.org/2000/svg","rect");
+    rect.setAttribute("x",xx-bw/2);rect.setAttribute("y",yy);rect.setAttribute("width",bw);rect.setAttribute("height",y0-yy);
+    rect.setAttribute("fill","var(--s1)");rect.setAttribute("rx",4);svg.appendChild(rect);
+    var lab=document.createElementNS("http://www.w3.org/2000/svg","text");
+    lab.setAttribute("x",xx);lab.setAttribute("y",yy-5);lab.setAttribute("fill","var(--text-sec)");lab.setAttribute("font-size","11");lab.setAttribute("font-weight","600");lab.setAttribute("text-anchor","middle");lab.textContent=c.n;svg.appendChild(lab);
+    var nm=document.createElementNS("http://www.w3.org/2000/svg","text");nm.setAttribute("x",xx-bw/2);nm.setAttribute("y",y0+16);nm.setAttribute("fill",varInkMuted());nm.setAttribute("font-size","11");nm.setAttribute("text-anchor","middle");nm.textContent=c.company;svg.appendChild(nm);
+  });
+  $("subCompanies").textContent=arr.length+" companies shown · "+filtered.length+" applications";
+  var tb=$("tblCompanies");tb.innerHTML="";
+  arr.forEach(function(c){
+    var tr=document.createElement("tr");
+    var tdC=document.createElement("td");tdC.textContent=c.company;
+    var tdN=document.createElement("td");tdN.textContent=c.n;tdN.style.fontVariantNumeric="tabular-nums";
+    var topS=Object.entries(c.status).sort(function(a,b){return b[1]-a[1]})[0];var tdS=document.createElement("td");tdS.textContent=topS?topS[0]:"—";
+    tr.appendChild(tdC);tr.appendChild(tdN);tr.appendChild(tdS);tb.appendChild(tr);
+  });
+}
+function varGrid(){return getComputedStyle(document.documentElement).getPropertyValue("--grid").trim();}
+function varInkMuted(){return getComputedStyle(document.documentElement).getPropertyValue("--text-sec").trim();}
+load();
+</script>
+</body>
+</html>

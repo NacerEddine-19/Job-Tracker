@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Application Tracker</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--text:#1b2033;--muted:#6b7390;--line:#e4e7f0;--accent:#4f46e5;--accent-t:#fff;
+--c-wish:#7c3aed;--c-applied:#2563eb;--c-interview:#d97706;--c-offer:#059669;--c-rejected:#dc2626;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1220;--card:#181c30;--text:#e8eaf5;--muted:#9097b5;--line:#2a2f4a;--accent:#818cf8;--accent-t:#0f1220;
+--c-wish:#a78bfa;--c-applied:#60a5fa;--c-interview:#fbbf24;--c-offer:#34d399;--c-rejected:#f87171;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:24px 16px 48px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:20px}
+h1{margin:0;font-size:24px}header p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--text);padding:9px 14px;border-radius:10px;font:inherit;cursor:pointer;text-decoration:none}
+.btn.primary{background:var(--accent);color:var(--accent-t);border-color:var(--accent);font-weight:600}
+.btn:hover{filter:brightness(.95)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;border-top:4px solid var(--c)}
+.stat b{display:block;font-size:26px}.stat span{color:var(--muted);font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:20px}
+.card h2{margin:0 0 12px;font-size:17px}
+form{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+input,select,textarea{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.full{grid-column:1/-1}
+.bar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}.bar input{flex:1;min-width:180px}.bar select{width:auto}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:820px}
+th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{background:var(--line)}
+th.sortable .sortdir{opacity:.55;margin-left:6px;font-size:11px;display:inline-block}
+td small{color:var(--muted);display:block}a{color:var(--accent)}
+.pill{border-radius:99px;padding:4px 8px;font-weight:600;font-size:13px;border:1px solid var(--c);color:var(--c);background:transparent;width:auto}
+details summary{cursor:pointer;color:var(--accent)}details p{margin:6px 0 0;white-space:pre-wrap;max-width:360px;max-height:220px;overflow:auto}
+.x{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px}.x:hover{color:var(--c-rejected)}
+.empty{text-align:center;color:var(--muted);padding:28px 0}
+#msg{display:none;margin-bottom:16px;padding:10px 14px;border-radius:10px;background:var(--card);border:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div><h1>Job Application Tracker</h1><p>Every change is saved to <code>applications.csv</code> on your computer.</p></div>
+  <div class="btns">
+    <button class="btn" id="toggle">Add application</button>
+    <button class="btn" id="imp">Import CSV</button>
+    <a class="btn primary" href="/applications.csv" download>Download CSV</a>
+    <input type="file" id="file" accept=".csv,text/csv" hidden>
+  </div>
+</header>
+<div id="msg"></div>
+<section class="stats" id="stats"></section>
+<section class="card" id="formCard" hidden>
+  <h2>New application</h2>
+  <form id="form">
+    <label>Company *<input name="company" required></label>
+    <label>Role *<input name="role" required></label>
+    <label>Location<input name="location"></label>
+    <label>Date applied<input type="date" name="date"></label>
+    <label>Status<select name="status"></select></label>
+    <label>Job link<input type="url" name="link" placeholder="https://"></label>
+    <label class="full">Job description<textarea name="description" rows="4" placeholder="Paste the job description here"></textarea></label>
+    <label class="full">Notes<textarea name="notes" rows="2" placeholder="Contact, next step, salary range…"></textarea></label>
+    <div class="full"><button class="btn primary" type="submit" id="formBtn">Save application</button><input type="hidden" id="editId"></div>
+  </form>
+</section>
+<section class="card">
+  <h2>Applications</h2>
+  <div class="bar"><input id="q" placeholder="Search company, role, description, notes…"><select id="f"></select></div>
+  <div class="tw"><table><thead><tr><th class="sortable" onclick="sort('company')">Company / Role<span class="sortdir" id="sd-company"></span></th><th class="sortable" onclick="sort('location')">Location<span class="sortdir" id="sd-location"></span></th><th class="sortable" onclick="sort('date')">Applied<span class="sortdir" id="sd-date"></span></th><th class="sortable" onclick="sort('status')">Status<span class="sortdir" id="sd-status"></span></th><th class="sortable" onclick="sort('description')">Description<span class="sortdir" id="sd-description"></span></th><th class="sortable" onclick="sort('notes')">Notes<span class="sortdir" id="sd-notes"></span></th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+</section>
+</div>
+<script>
+var STATUSES=[["Wishlist","--c-wish"],["Applied","--c-applied"],["Interview","--c-interview"],["Offer","--c-offer"],["Rejected","--c-rejected"]];
+var apps=[],sortKey="date",sortDir=-1,$=function(id){return document.getElementById(id)};
+function skey(a){var v;switch(sortKey){case"company":v=(a.company||"").toLowerCase()+" # "+(a.role||"").toLowerCase();break;case"location":v=(a.location||"").toLowerCase();break;case"date":v=a.date||"";break;case"status":v=STATUSES.indexOf(a.status);if(v<0)v=STATUSES.length;break;case"description":case"notes":v=(a[sortKey]||"").toLowerCase();break;default:v=(a[sortKey]||"").toString().toLowerCase();break;}return v}
+function sort(key){if(sortKey===key)sortDir=-sortDir;else{sortKey=key;sortDir=(key==="date")?-1:1;}render()}
+function esc(s){var d=document.createElement("div");d.textContent=s==null?"":s;return d.innerHTML}
+function col(s){for(var i=0;i<STATUSES.length;i++)if(STATUSES[i][0]===s)return STATUSES[i][1];return "--muted"}
+function say(t){var m=$("msg");m.textContent=t;m.style.display="block";clearTimeout(say.t);say.t=setTimeout(function(){m.style.display="none"},6000)}
+async function api(method,url,body,raw){
+  var r=await fetch(url,{method:method,headers:{"Content-Type":raw?"text/csv":"application/json"},body:body==null?undefined:(raw?body:JSON.stringify(body))});
+  var j=await r.json();if(!r.ok)throw new Error(j.error||"Request failed");return j}
+async function load(){try{apps=await api("GET","/api/applications");render()}catch(e){say(e.message)}}
+var opts=STATUSES.map(function(s){return '<option>'+s[0]+'</option>'}).join("");
+var sf=document.querySelector('[name=status]');sf.innerHTML=opts;sf.value="Applied";
+$("f").innerHTML='<option value="">All statuses</option>'+opts;
+function today(){return new Date().toISOString().slice(0,10)}
+document.querySelector('[name=date]').value=today();
+function openEdit(id){
+  var a=apps.find(function(x){return x.id===id});if(!a)return;
+  var f=$("form"),b=$("formBtn");
+  f.company.value=a.company;f.role.value=a.role;f.location.value=a.location;
+  f.date.value=a.date;f.status.value=a.status;f.link.value=a.link;
+  f.description.value=a.description;f.notes.value=a.notes;
+  $("editId").value=id;b.textContent="Update application";
+  $("formCard").hidden=false;f.company.focus();
+}
+function render(){
+  $("stats").innerHTML='<div class="stat" style="--c:var(--accent)"><b>'+apps.length+'</b><span>Total</span></div>'+
+    STATUSES.map(function(s){var n=apps.filter(function(a){return a.status===s[0]}).length;
+      return '<div class="stat" style="--c:var('+s[1]+')"><b>'+n+'</b><span>'+s[0]+'</span></div>'}).join("");
+  var q=$("q").value.toLowerCase(),f=$("f").value;
+  var list=apps.filter(function(a){return(!f||a.status===f)&&(!q||(a.company+" "+a.role+" "+a.location+" "+a.description+" "+a.notes).toLowerCase().indexOf(q)>-1)});
+  list.sort(function(a,b){var c=skey(a)<skey(b)?-1:skey(a)>skey(b)?1:0;return c*sortDir});
+  ["company","location","date","status","description","notes"].forEach(function(k){
+    var el=$("sd-"+k);if(el)el.textContent=sortKey===k?(sortDir===1?"&#9650;":"&#9660;"):"";
+  });
+  $("rows").innerHTML=list.length?list.map(function(a){
+    return '<tr><td><b>'+esc(a.company)+'</b><small>'+(a.link?'<a href="'+esc(a.link)+'" target="_blank" rel="noopener">'+esc(a.role)+'</a>':esc(a.role))+'</small></td>'+
+    '<td>'+esc(a.location)+'</td><td>'+esc(a.date)+'</td>'+
+    '<td><select class="pill" style="--c:var('+col(a.status)+')" data-id="'+a.id+'">'+STATUSES.map(function(s){return '<option'+(s[0]===a.status?' selected':'')+'>'+s[0]+'</option>'}).join("")+'</select></td>'+
+    '<td>'+(a.description?'<details><summary>View</summary><p>'+esc(a.description)+'</p></details>':'')+'</td>'+
+    '<td>'+esc(a.notes)+'</td><td><button class="x" title="Edit" data-edit="'+a.id+'">✎</button><button class="x" title="Delete" data-del="'+a.id+'">×</button></td></tr>'}).join("")
+    :'<tr><td colspan="7" class="empty">'+(apps.length?'No matches.':'No applications yet. Add one or import a CSV.')+'</td></tr>';
+}
+$("toggle").onclick=function(){var c=$("formCard"),f=$("form");c.hidden=!c.hidden;if(!c.hidden){f.reset();$("editId").value="";$("formBtn").textContent="Save application";document.querySelector('[name=date]').value=today();f.company.focus()}};
+$("form").onsubmit=async function(e){e.preventDefault();var d=Object.fromEntries(new FormData(e.target));
+  var edit=$("editId").value;
+  try{
+    if(edit){await api("PUT","/api/applications/"+edit,d);say("Updated");}
+    else{await api("POST","/api/applications",d);say("Saved to applications.csv");}
+    e.target.reset();$("editId").value="";$("formBtn").textContent="Save application";sf.value="Applied";
+    document.querySelector('[name=date]').value=today();load();
+  }catch(x){say(x.message)}};
+$("rows").onchange=async function(e){var id=e.target.getAttribute("data-id");if(!id)return;
+  try{await api("PUT","/api/applications/"+id,{status:e.target.value});load()}catch(x){say(x.message);load()}};
+$("rows").onclick=async function(e){
+  var idE=e.target.getAttribute("data-edit"),idD=e.target.getAttribute("data-del");
+  if(idE){openEdit(idE);return;}
+  if(!idD)return;
+  if(confirm("Delete this application?")){try{await api("DELETE","/api/applications/"+idD);load()}catch(x){say(x.message)}}};
+$("imp").onclick=function(){$("file").click()};
+$("file").onchange=async function(e){var f=e.target.files[0];if(!f)return;
+  try{var r=await api("POST","/api/import",await f.text(),true);say("Imported "+r.added+" new, skipped "+r.skipped+" duplicate(s)");load()}catch(x){say(x.message)}
+  e.target.value=""};
+$("q").oninput=render;$("f").onchange=render;
+load();
+</script>
+</body>
+</html>
