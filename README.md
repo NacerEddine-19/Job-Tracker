@@ -40,10 +40,6 @@ job-tracker/
 └── LICENSE
 ```
 
-## GitHub readiness
-
-`applications.csv` contains your personal job data and is excluded via `.gitignore`, so it won't be committed. The repository ships without data; `server.py` creates an empty `applications.csv` on first run.
-
 ## License
 
 [MIT](LICENSE)
